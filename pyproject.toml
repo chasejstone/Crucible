@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crucible"
+version = "0.1.0"
+description = "Local, offline malware analysis sandbox with static and dynamic analysis."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Crucible" }]
+dependencies = [
+    "pefile>=2023.2.7",
+    "psutil>=5.9.0",
+    "yara-python>=4.3.0",
+]
+
+[project.scripts]
+crucible = "crucible.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["crucible*"]
