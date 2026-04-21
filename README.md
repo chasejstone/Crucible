@@ -1,78 +1,59 @@
 # Crucible
 
-A local, offline malware analysis sandbox for Linux. Crucible takes a
-suspicious file, runs a bunch of static checks on it, optionally runs it
-inside a contained subprocess to see what it tries to do, and spits out a
-JSON and Markdown report with a suspicion score and MITRE ATT&CK tags.
+you throw a sketchy file at it, it tells you how sketchy the file is. that's it.
 
-No cloud services. No third party lookups. No telemetry. You give it a
-file, it gives you a report.
+it's a CLI tool that runs entirely on your laptop (no cloud, no signups, no calling home), does a bunch of static checks on whatever you point it at, optionally runs the thing in a little cage to watch what it tries to do, and then dumps a report with a score out of 100.
 
-## Why I built this
+## why
 
-I kept finding myself copy pasting the same five commands whenever I wanted
-to poke at a random binary I'd downloaded: `file`, `strings`, `sha256sum`,
-`readelf`, a quick `strace` on something that probably shouldn't be trusted.
-Crucible is those habits glued into one CLI, plus a scorer so I don't have
-to eyeball the output every time.
+i kept typing the same five commands every time someone sent me a weird file. `file`, `strings`, `sha256sum`, maybe `readelf` if i was being fancy, then `strace` if i was brave. after the hundredth time i figured i'd just glue them together and add a scorer so i don't have to squint at output. this is that.
 
-It's a portfolio project so the code tries to be clean and typed and
-tested, but it's also genuinely useful for triage work on a Linux box.
+also it's a portfolio thing so the code is reasonably clean, tests exist, docstrings aren't lies, etc.
 
-## What it does
+## what it actually does
 
-### Static analysis (always runs)
-- File hashes: MD5, SHA1, SHA256
-- File type sniffing (ELF, PE, shebang scripts, plain text)
-- ELF header parsing with stdlib only: architecture, sections, dynamic
-  imports and exports
-- PE header parsing via `pefile`: architecture, imports, exports, section
-  entropy
-- Per-section Shannon entropy and a packed-section heuristic
-  (threshold: 7.2 bits per byte)
-- Printable strings extraction (ASCII + UTF-16LE) with regex flagging for
-  IPs, URLs, registry keys, suspicious Win32 APIs, shell one-liners,
-  reverse shell patterns, crypto wallet addresses, and emails
-- YARA rule scanning against `rules/` (baseline ruleset included)
+### stuff it does to the file without running it
+- md5 / sha1 / sha256 hashes (standard triage stuff)
+- sniffs what kind of file it is (elf, pe, shell script, python, plain text)
+- parses elf headers in pure stdlib, no extra libs needed
+- parses pe headers using `pefile` (imports, exports, sections)
+- calculates entropy per section to catch packers (anything above 7.2 bits/byte is probably compressed or encrypted)
+- rips out all the printable strings (ascii + utf-16le because windows malware loves wide strings) and runs regexes to flag the spicy ones: ips, urls, registry keys, `VirtualAlloc` / `CreateRemoteThread` / friends, reverse shell one-liners, crypto wallet addresses, emails
+- runs yara rules against it (there's a starter ruleset in `rules/`, drop your own in there)
 
-### Dynamic analysis (opt-in, Linux only)
-- Spawns the target inside a fresh network namespace via `unshare -rn`,
-  so any network calls it makes are visible but can't actually reach
-  anything
-- Wraps the process with `strace -f` to log every syscall
-- Tracks child processes and their command lines using `psutil`
-- Derives filesystem activity (reads, writes, deletes, sensitive paths)
-  from the syscall log
-- Derives network activity (socket, connect, bind, sendto) from the
-  syscall log
-- Enforces a configurable timeout, then kills the whole process group
+### stuff it does while the file is running (if you let it)
+- spawns it inside `unshare -rn` so it gets a brand new network namespace with no interfaces. it can still *try* to make network calls, we just catch them and they go nowhere
+- wraps the process with `strace -f` to log every syscall it and its children make
+- uses `psutil` to watch any child processes that spawn
+- figures out fs activity (what got read, what got written, what got deleted, what hit sensitive spots like `/etc/cron.d` or `~/.ssh`) by looking at the syscall log
+- same for network: socket, connect, bind, sendto
+- has a timeout, kills the whole process group when it fires
 
-### Reporting
-- Weighted suspicion score (0-100) with per-indicator breakdown
-- MITRE ATT&CK technique IDs for every indicator that fired
-- Writes both a JSON report and a human-readable Markdown report into
-  `reports/` (configurable)
+### what you get back
+- a 0-100 score with reasons
+- matching MITRE ATT&CK technique IDs for whatever tripped
+- a json file (good for piping into other tools) and a markdown file (good for reading with your eyes), both dropped into `reports/`
 
-## Architecture
+## how it's wired together
 
 ```mermaid
 flowchart TD
-    A[input file] --> B[filetype sniff]
-    B --> C[static analyzers]
-    B --> D{runnable on linux?}
+    A[file] --> B[what is this thing?]
+    B --> C[static stuff]
+    B --> D{can we run it on linux?}
     C --> C1[hashes]
     C --> C2[pe / elf parser]
-    C --> C3[strings + regex flags]
-    C --> C4[entropy + packer check]
-    C --> C5[yara scan]
-    D -- yes --> E[sandbox: unshare -rn + strace]
-    D -- no --> F[skip dynamic]
+    C --> C3[strings + flags]
+    C --> C4[entropy check]
+    C --> C5[yara]
+    D -- yeah --> E[sandbox]
+    D -- nope --> F[skip]
     E --> E1[syscall tracer]
-    E --> E2[psutil process watcher]
-    E1 --> G1[fs monitor]
-    E1 --> G2[net monitor]
-    E2 --> G3[proc summary]
-    C1 --> H[findings aggregator]
+    E --> E2[process watcher]
+    E1 --> G1[fs activity]
+    E1 --> G2[net activity]
+    E2 --> G3[child procs]
+    C1 --> H[findings bucket]
     C2 --> H
     C3 --> H
     C4 --> H
@@ -82,15 +63,14 @@ flowchart TD
     G3 --> H
     F --> H
     H --> I[scorer]
-    I --> J[MITRE mapper]
+    I --> J[mitre tags]
     J --> K[json report]
     J --> L[markdown report]
 ```
 
-## Install
+## getting it running
 
-Requires Linux, Python 3.9+, `strace`, and `unshare`. YARA needs the
-`libyara` shared library for `yara-python` to build.
+you need linux, python 3.9 or newer, `strace`, `unshare`, and `libyara` for the yara bindings.
 
 ```bash
 git clone <this repo>
@@ -98,31 +78,30 @@ cd Crucible
 make install
 ```
 
-Or manually:
+or if you'd rather do it by hand:
 
 ```bash
 pip install -r requirements.txt
 pip install -e .
 ```
 
-## Usage
+## using it
 
 ```bash
-# full scan with static + dynamic
-crucible scan ./sample.bin
+# normal scan, static + dynamic
+crucible scan ./weird_file
 
-# static only (safer if you don't trust unshare on your box)
-crucible scan ./sample.bin --no-dynamic
+# static only, if you don't want to execute anything
+crucible scan ./weird_file --no-dynamic
 
-# longer timeout, verbose logging
-crucible scan ./sample.bin --timeout 30 -v
+# longer timeout and chatty logs
+crucible scan ./weird_file --timeout 30 -v
 
-# custom output dir and rules dir
-crucible scan ./sample.bin --output /tmp/reports --rules ./my-rules/
+# put reports somewhere else, use your own yara rules
+crucible scan ./weird_file --output /tmp/out --rules ./my-rules/
 ```
 
-Running it prints a one-line summary and drops two files under
-`reports/`:
+you'll get something like:
 
 ```
 Suspicion score: 34/100 (medium)
@@ -130,49 +109,45 @@ JSON report:     reports/sample_9c1f3b72a1f8.json
 Markdown report: reports/sample_9c1f3b72a1f8.md
 ```
 
-The filename stem includes the first 12 chars of the SHA-256 so repeat
-scans don't clobber each other.
+filenames include the first 12 chars of the sha256 so rerunning on the same file overwrites cleanly and different files don't clobber each other.
 
-## How the scoring works
+## how the score gets made
 
-Every indicator has a per-hit weight and a per-category cap. The total is
-clamped to 100. Current weights live in
-[`crucible/report/scorer.py`](crucible/report/scorer.py).
+it's a bag of points. every indicator has a per-hit value and a cap so one noisy thing can't blow up the total. add it all up, clamp at 100. full table is in [`crucible/report/scorer.py`](crucible/report/scorer.py) if you want to mess with the weights.
 
-| Indicator | Per hit | Cap |
+| thing | points per hit | cap |
 | --- | --- | --- |
-| Packed section | 15 | 15 |
-| High entropy (not packed) | 8 | 8 |
-| YARA rule match | 20 | 40 |
-| Suspicious Win32 API string | 5 | 20 |
-| Reverse shell string | 15 | 15 |
-| Shell one-liner string | 10 | 10 |
-| URL string | 3 | 9 |
-| IPv4 string | 3 | 9 |
-| Network connect attempt | 15 | 15 |
-| Network send attempt | 10 | 10 |
-| Write to sensitive path | 15 | 30 |
-| Write to crontab | 20 | 20 |
-| Write to systemd unit dir | 20 | 20 |
-| Write to SSH config | 20 | 20 |
-| Shell child process | 10 | 10 |
-| Downloader child process | 15 | 15 |
+| packed section | 15 | 15 |
+| high entropy (not quite packed) | 8 | 8 |
+| yara rule match | 20 | 40 |
+| win32 api string | 5 | 20 |
+| reverse shell string | 15 | 15 |
+| shell one-liner string | 10 | 10 |
+| url in strings | 3 | 9 |
+| ipv4 in strings | 3 | 9 |
+| tried to `connect()` | 15 | 15 |
+| tried to `sendto()` | 10 | 10 |
+| write to sensitive path | 15 | 30 |
+| write to crontab | 20 | 20 |
+| write to systemd unit dir | 20 | 20 |
+| write to ssh config | 20 | 20 |
+| spawned a shell | 10 | 10 |
+| spawned curl / wget / nc | 15 | 15 |
 
-Score label bands:
+labels:
 
-| Range | Label |
+| score | label |
 | --- | --- |
 | 0-24 | low |
 | 25-49 | medium |
 | 50-74 | high |
 | 75-100 | critical |
 
-## MITRE ATT&CK mapping
+## mitre tags
 
-Indicator keys map to one or more technique IDs. The table is in
-[`crucible/report/mitre.py`](crucible/report/mitre.py). A few examples:
+every indicator maps to one or more ATT&CK technique IDs. table lives in [`crucible/report/mitre.py`](crucible/report/mitre.py). examples:
 
-| Crucible indicator | ATT&CK technique |
+| what tripped | mitre |
 | --- | --- |
 | packed_sections | T1027.002 Software Packing |
 | suspicious_api_import | T1055 Process Injection, T1106 Native API |
@@ -182,53 +157,45 @@ Indicator keys map to one or more technique IDs. The table is in
 | write_crontab | T1053.003 Cron |
 | write_ssh | T1098.004 SSH Authorized Keys |
 
-## Safety notes
+## don't be dumb
 
-The dynamic stage runs the sample on your actual host, just with a new
-network namespace and strace wrapping. That's not a real VM. If you're
-looking at known-nasty samples, spin up a throwaway VM first. Pass
-`--no-dynamic` anytime you only want to poke at the bytes without
-executing anything.
+the dynamic stage runs the file on your actual machine, just in a network namespace with strace attached. that is *not* a real sandbox. if you're poking at something you know is bad, boot a vm first. use `--no-dynamic` when you just want to look at the bytes without executing anything.
 
-Crucible will only execute ELF binaries and script files on Linux. PE
-files always skip dynamic analysis with a clear reason in the report.
+pe files never get executed. you'll get static analysis and a note in the report.
 
-## Tests
+## tests
 
 ```bash
 make test
 ```
 
-Covers hashing, entropy math, string regex flagging, scorer boundaries,
-MITRE mapping, tracer line parsing, and filesystem syscall classification.
+covers hashes, entropy math, string flagging, filetype sniffing, scorer edge cases, mitre mapping, strace line parsing, and syscall -> fs classification. 31 tests, runs in under a second.
 
-## Layout
+## layout
 
 ```
 crucible/
-├── crucible/            # the package
+├── crucible/            # the actual package
 │   ├── cli.py
 │   ├── static/          # hashes, entropy, strings, pe, elf, yara
-│   ├── dynamic/         # sandbox, tracer, fs/net/proc monitors
-│   ├── report/          # scorer, mitre, json + markdown renderers
+│   ├── dynamic/         # sandbox + monitors
+│   ├── report/          # scorer, mitre, json + markdown
 │   └── utils/
-├── rules/               # baseline YARA rules
-├── reports/             # generated reports go here
+├── rules/               # yara rules
+├── reports/             # output lands here
 ├── tests/
 ├── requirements.txt
 ├── pyproject.toml
 └── Makefile
 ```
 
-## Limitations
+## what it isn't
 
-- Linux host only. The dynamic stage relies on strace and unshare.
-- PE files get static analysis only. No Wine bridge on purpose to keep
-  deps light.
-- Not a replacement for a real sandbox like Cuckoo. Treat the dynamic
-  stage as "extra signal", not containment.
-- YARA rules included are generic starters. Drop your own into `rules/`.
+- not a windows tool. linux only because the dynamic bits need strace and unshare.
+- pe files get static only, no wine. keeping dependencies small on purpose.
+- not trying to be cuckoo or any.run. treat the dynamic stage as a hint, not containment.
+- the bundled yara rules are generic starters. drop real ones in `rules/` for anything serious.
 
-## License
+## license
 
 MIT.

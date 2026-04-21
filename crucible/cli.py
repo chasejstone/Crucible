@@ -159,23 +159,23 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the top level argparse parser."""
     parser = argparse.ArgumentParser(
         prog="crucible",
-        description="Offline malware analysis sandbox: static + dynamic.",
+        description="throw a sketchy file at it, get a score back.",
     )
     parser.add_argument("--version", action="version", version=f"crucible {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    scan = sub.add_parser("scan", help="Scan a file and emit a report.")
-    scan.add_argument("file", help="Path to the file to analyze.")
+    scan = sub.add_parser("scan", help="scan a file and write a report.")
+    scan.add_argument("file", help="path to the file you want to look at.")
     scan.add_argument("--no-dynamic", action="store_true",
-                      help="Skip the dynamic analysis stage.")
+                      help="skip the dynamic stage, don't run the file.")
     scan.add_argument("--timeout", type=int, default=15,
-                      help="Dynamic run timeout in seconds (default: 15).")
+                      help="how long to let it run in seconds (default: 15).")
     scan.add_argument("--output", default=str(DEFAULT_REPORTS_DIR),
-                      help="Directory to write reports into.")
+                      help="where reports go.")
     scan.add_argument("--rules", default=str(DEFAULT_RULES_DIR),
-                      help="Directory containing YARA rule files.")
+                      help="folder with yara rule files.")
     scan.add_argument("-v", "--verbose", action="store_true",
-                      help="Enable debug logging.")
+                      help="chattier logs.")
     scan.set_defaults(func=cmd_scan)
 
     return parser
