@@ -74,9 +74,8 @@ def _build_invocation(target: Path, ftype: FileType,
                       trace_log: Path) -> Optional[List[str]]:
     """Compose the command line we'll hand to Popen.
 
-    Returns None if the file type isn't runnable on Linux. When ``unshare``
-    is available we wrap in ``unshare -rn`` for a fresh network namespace.
-    When ``strace`` is missing we just skip tracing and report that.
+    Returns None if the file type isn't runnable on Linux. Both ``unshare``
+    and ``strace`` are required so a sample is never run with host networking.
     """
     if not ftype.executable_on_linux:
         return None
@@ -85,11 +84,11 @@ def _build_invocation(target: Path, ftype: FileType,
         log.warning("strace not available, dynamic stage will be skipped")
         return None
 
-    runner: List[str] = []
-    if _have("unshare"):
-        runner += ["unshare", "-rn"]
-    else:
-        log.warning("unshare not available, sample will share host namespaces")
+    if not _have("unshare"):
+        log.warning("unshare not available, dynamic stage will be skipped")
+        return None
+
+    runner: List[str] = ["unshare", "-rn"]
 
     runner += ["strace", "-f", "-qq", "-s", "256", "-o", str(trace_log)]
 

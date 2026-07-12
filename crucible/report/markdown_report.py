@@ -75,7 +75,7 @@ def render(findings: Dict[str, Any]) -> str:
     if techniques:
         lines.append(_h("MITRE ATT&CK mapping"))
         for t in techniques:
-            lines.append(f"- **{t['id']}** — {t['name']}\n")
+            lines.append(f"- **{t['id']}**: {t['name']}\n")
         lines.append("\n")
 
     lines.append(_h("Hashes"))
@@ -158,7 +158,7 @@ def render(findings: Dict[str, Any]) -> str:
         lines.append(_h("Processes observed", 3))
         for p in procs.get("processes", [])[:30]:
             cmd = " ".join(p.get("cmdline") or []) or p.get("name", "")
-            lines.append(f"- pid {p.get('pid')} — `{cmd}`\n")
+            lines.append(f"- pid {p.get('pid')}: `{cmd}`\n")
         lines.append("\n")
 
     lines.append("---\n")
