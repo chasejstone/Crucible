@@ -57,8 +57,11 @@ def _accumulate(category: str, hits: int, totals: Dict[str, int],
     if hits <= 0 or category not in WEIGHTS:
         return
     per_hit, cap = WEIGHTS[category]
-    contribution = min(per_hit * hits, cap)
-    totals[category] = totals.get(category, 0) + contribution
+    current = totals.get(category, 0)
+    contribution = min(per_hit * hits, cap - current)
+    if contribution <= 0:
+        return
+    totals[category] = current + contribution
     breakdown.append({
         "indicator": category,
         "hits": hits,

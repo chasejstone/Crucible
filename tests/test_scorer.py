@@ -70,3 +70,29 @@ def test_medium_label_threshold() -> None:
     }
     result = score(findings)
     assert result.score >= 19
+
+
+def test_repeated_hits_respect_category_cap() -> None:
+    findings = {
+        "static": {},
+        "dynamic": {
+            "ran": True,
+            "filesystem": {
+                "sensitive_writes": [
+                    "/etc/cron.d/first",
+                    "/etc/cron.d/second",
+                    "/etc/cron.d/third",
+                ],
+            },
+        },
+    }
+
+    result = score(findings)
+    cron_points = sum(
+        row["points"]
+        for row in result.breakdown
+        if row["indicator"] == "write_crontab"
+    )
+
+    assert cron_points == 20
+    assert result.score == 50

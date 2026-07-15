@@ -119,11 +119,15 @@ def run(target: Path, ftype: FileType,
         shutil.copy2(target, staged)
         staged.chmod(staged.stat().st_mode | stat.S_IXUSR | stat.S_IRUSR)
     except OSError as exc:
+        if owns_workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         return DynamicResult(ran=False, reason=f"staging failed: {exc}")
 
     trace_log = workdir / "trace.log"
     cmd = _build_invocation(staged, ftype, trace_log)
     if cmd is None:
+        if owns_workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         return DynamicResult(ran=False,
                              reason="no suitable invocation for this file type")
 
@@ -142,6 +146,8 @@ def run(target: Path, ftype: FileType,
             start_new_session=True,
         )
     except OSError as exc:
+        if owns_workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         return DynamicResult(ran=False, reason=f"spawn failed: {exc}")
 
     watcher = proc_monitor.ProcessWatcher(proc.pid).start()

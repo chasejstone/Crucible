@@ -1,17 +1,40 @@
 __pycache__/
 *.py[cod]
-*.egg-info/
-.pytest_cache/
-.venv/
-venv/
+*$py.class
+*.so
+
+# Distribution / packaging
 build/
 dist/
+*.egg-info/
 *.egg
 
-# generated reports, keep the folder itself
+# Test caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated reports, keep the folder itself
 reports/*.json
 reports/*.md
 !reports/.gitkeep
 
-# ad hoc sandbox workdirs
+# Ad hoc sandbox workdirs
 .crucible_work/
