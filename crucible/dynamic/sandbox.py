@@ -74,9 +74,8 @@ def _build_invocation(target: Path, ftype: FileType,
                       trace_log: Path) -> Optional[List[str]]:
     """Compose the command line we'll hand to Popen.
 
-    Returns None if the file type isn't runnable on Linux. When ``unshare``
-    is available we wrap in ``unshare -rn`` for a fresh network namespace.
-    When ``strace`` is missing we just skip tracing and report that.
+    Returns None if the file type isn't runnable on Linux. Both ``unshare``
+    and ``strace`` are required so a sample is never run with host networking.
     """
     if not ftype.executable_on_linux:
         return None
@@ -85,11 +84,11 @@ def _build_invocation(target: Path, ftype: FileType,
         log.warning("strace not available, dynamic stage will be skipped")
         return None
 
-    runner: List[str] = []
-    if _have("unshare"):
-        runner += ["unshare", "-rn"]
-    else:
-        log.warning("unshare not available, sample will share host namespaces")
+    if not _have("unshare"):
+        log.warning("unshare not available, dynamic stage will be skipped")
+        return None
+
+    runner: List[str] = ["unshare", "-rn"]
 
     runner += ["strace", "-f", "-qq", "-s", "256", "-o", str(trace_log)]
 
@@ -120,11 +119,15 @@ def run(target: Path, ftype: FileType,
         shutil.copy2(target, staged)
         staged.chmod(staged.stat().st_mode | stat.S_IXUSR | stat.S_IRUSR)
     except OSError as exc:
+        if owns_workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         return DynamicResult(ran=False, reason=f"staging failed: {exc}")
 
     trace_log = workdir / "trace.log"
     cmd = _build_invocation(staged, ftype, trace_log)
     if cmd is None:
+        if owns_workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         return DynamicResult(ran=False,
                              reason="no suitable invocation for this file type")
 
@@ -143,6 +146,8 @@ def run(target: Path, ftype: FileType,
             start_new_session=True,
         )
     except OSError as exc:
+        if owns_workdir:
+            shutil.rmtree(workdir, ignore_errors=True)
         return DynamicResult(ran=False, reason=f"spawn failed: {exc}")
 
     watcher = proc_monitor.ProcessWatcher(proc.pid).start()

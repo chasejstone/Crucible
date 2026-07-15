@@ -169,7 +169,7 @@ pe files never get executed. you'll get static analysis and a note in the report
 make test
 ```
 
-covers hashes, entropy math, string flagging, filetype sniffing, scorer edge cases, mitre mapping, strace line parsing, and syscall -> fs classification. 31 tests, runs in under a second.
+covers hashes, entropy math, string flagging, filetype sniffing, scorer edge cases, mitre mapping, strace line parsing, and syscall -> fs classification. the suite runs in under a second.
 
 ## layout
 
@@ -198,4 +198,4 @@ crucible/
 
 ## license
 
-MIT.
+MIT. See [LICENSE](LICENSE).
