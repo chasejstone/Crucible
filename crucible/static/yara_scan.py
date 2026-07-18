@@ -1,6 +1,7 @@
 """YARA rule compilation and matching.
 
-Rules are loaded from a directory (default: ``rules/`` at the repo root).
+Rules are loaded from a directory. The CLI defaults to the rules bundled with
+the installed package.
 All ``.yar`` and ``.yara`` files in that directory get compiled into one
 namespace. If yara-python isn't installed we degrade gracefully instead of
 exploding: the scan still runs, we just report no matches.

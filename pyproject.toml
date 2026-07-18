@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,8 +8,8 @@ version = "0.1.0"
 description = "Throw a sketchy file at it, get a suspicion score back."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
-authors = [{ name = "Crucible" }]
+license = "MIT"
+authors = [{ name = "Chase Stone" }]
 dependencies = [
     "pefile>=2023.2.7",
     "psutil>=5.9.0",
@@ -21,3 +21,6 @@ crucible = "crucible.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["crucible*"]
+
+[tool.setuptools.package-data]
+crucible = ["rules/*.yar"]

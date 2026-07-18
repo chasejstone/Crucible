@@ -24,8 +24,8 @@ from crucible.static import yara_scan
 from crucible.utils.filetype import sniff
 from crucible.utils.logging import get_logger
 
-DEFAULT_RULES_DIR = Path(__file__).resolve().parent.parent / "rules"
-DEFAULT_REPORTS_DIR = Path(__file__).resolve().parent.parent / "reports"
+DEFAULT_RULES_DIR = Path(__file__).resolve().parent / "rules"
+DEFAULT_REPORTS_DIR = Path("reports")
 
 
 def _safe_call(fn, *args, logger, label: str, default=None, **kwargs):
