@@ -19,7 +19,7 @@ also it's a portfolio thing so the code is reasonably clean, tests exist, docstr
 - parses pe headers using `pefile` (imports, exports, sections)
 - calculates entropy per section to catch packers (anything above 7.2 bits/byte is probably compressed or encrypted)
 - rips out all the printable strings (ascii + utf-16le because windows malware loves wide strings) and runs regexes to flag the spicy ones: ips, urls, registry keys, `VirtualAlloc` / `CreateRemoteThread` / friends, reverse shell one-liners, crypto wallet addresses, emails
-- runs yara rules against it (there's a starter ruleset in `rules/`, drop your own in there)
+- runs yara rules against it (there's a starter ruleset bundled with the package)
 
 ### stuff it does while the file is running (if you let it)
 - spawns it inside `unshare -rn` so it gets a brand new network namespace with no interfaces. it can still *try* to make network calls, we just catch them and they go nowhere
@@ -180,8 +180,8 @@ crucible/
 │   ├── static/          # hashes, entropy, strings, pe, elf, yara
 │   ├── dynamic/         # sandbox + monitors
 │   ├── report/          # scorer, mitre, json + markdown
+│   ├── rules/           # bundled yara rules
 │   └── utils/
-├── rules/               # yara rules
 ├── reports/             # output lands here
 ├── tests/
 ├── requirements.txt
@@ -194,7 +194,7 @@ crucible/
 - not a windows tool. linux only because the dynamic bits need strace and unshare.
 - pe files get static only, no wine. keeping dependencies small on purpose.
 - not trying to be cuckoo or any.run. treat the dynamic stage as a hint, not containment.
-- the bundled yara rules are generic starters. drop real ones in `rules/` for anything serious.
+- the bundled yara rules are generic starters. pass `--rules` with a stronger ruleset for anything serious.
 
 ## license
 
